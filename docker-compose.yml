@@ -90,22 +90,22 @@ services:
     labels:
       - "traefik.enable=false" 
 
-  # portainer:
-  #   image: portainer/portainer
-  #   container_name: ui
-  #   restart: always
-  #   command: --no-analytics
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock
-  #     - /opt/portainer/data:/data
-  #   ports:
-  #     - 9000
-  #   labels:
-  #     - "traefik.backend=portainer"
-  #     - "traefik.frontend.rule=Host:ui.service.io"
-  #     - "traefik.enable=true"
-  #     - "traefik.port=9000"
-  #     - "traefik.tags=ui"
+  portainer:
+    image: portainer/portainer
+    container_name: ui
+    restart: always
+    command: --no-analytics
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/portainer/data:/data
+    ports:
+      - 9000
+    labels:
+      - "traefik.backend=portainer"
+      - "traefik.frontend.rule=Host:ui.service.io"
+      - "traefik.enable=true"
+      - "traefik.port=9000"
+      - "traefik.tags=ui"
 
   dns: 
     image: coredns/coredns
