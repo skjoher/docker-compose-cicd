@@ -1,0 +1,173 @@
+version: '3'
+services:
+  drone-server:
+    image: drone/drone:latest
+    container_name: drone
+    dns: 
+      - 172.17.0.1
+    ports:
+      - 80
+      - 443
+      - 9000
+    volumes:
+      - ./drone:/var/lib/drone/
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DRONE_OPEN=true
+      - DRONE_SERVER_HOST=drone-server
+      - DRONE_DEBUG=true
+      - DRONE_GIT_ALWAYS_AUTH=false
+      - DRONE_GOGS=true
+      - DRONE_GOGS_SKIP_VERIFY=false
+      - DRONE_GOGS_SERVER=http://gogs:3000
+      - DRONE_PROVIDER=gogs
+      - DRONE_DATABASE_DATASOURCE=/var/lib/drone/drone.sqlite
+      - DRONE_DATABASE_DRIVER=sqlite3
+      - DRONE_SERVER_PROTO=http
+      - DRONE_RPC_SECRET=bfc9f582d6a6fff9ffc46f5b67aa6192
+      - DRONE_SECRET=bfc9f582d6a6fff9ffc46f5b67aa6192
+    labels:
+      - "traefik.backend=drone-server"
+      - "traefik.frontend.rule=Host:drone.service.io"
+      - "traefik.enable=true"
+      - "traefik.port=80"
+      - "traefik.tags=drone"
+
+  gogs:
+    image: gogs/gogs:latest
+    container_name: git
+    dns: 
+      - 172.17.0.1
+    ports:
+      - "10022:22"
+      - "3000:3000"
+    volumes:
+      - ./data/gogs:/data
+    depends_on:
+      - mysql
+    labels:
+      - "traefik.backend=gogs"
+      - "traefik.frontend.rule=Host:git.service.io"
+      - "traefik.enable=true"
+      - "traefik.port=3000"
+      - "traefik.tags=git"
+    
+  mysql:
+    image: mysql:5.7.16
+    container_name: mysql
+
+    volumes:
+      - ./gogs/mysql:/var/lib/mysql
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - 3306:3306
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: pass
+      MYSQL_DATABASE: gogs
+      MYSQL_USER: gogs
+      MYSQL_PASSWORD: pass
+      TZ: Asia/Kolkata
+      MYSQL_ROOT_HOST: '0.0.0.0'
+    labels:
+      - "traefik.enable=false" 
+
+  drone-agent:
+    image: drone/agent:latest
+    dns: 172.17.0.1
+    container_name: agent
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - drone-server
+    environment:
+      - DRONE_RPC_SERVER=http://drone-server
+      - DRONE_RPC_SECRET=bfc9f582d6a6fff9ffc46f5b67aa6192
+      - DRONE_DEBUG=true
+      - DRONE_SERVER=drone-server:9000
+      - DRONE_SECRET=bfc9f582d6a6fff9ffc46f5b67aa6192
+      - DRONE_MAX_PROCS=5
+    labels:
+      - "traefik.enable=false" 
+
+  # portainer:
+  #   image: portainer/portainer
+  #   container_name: ui
+  #   restart: always
+  #   command: --no-analytics
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - /opt/portainer/data:/data
+  #   ports:
+  #     - 9000
+  #   labels:
+  #     - "traefik.backend=portainer"
+  #     - "traefik.frontend.rule=Host:ui.service.io"
+  #     - "traefik.enable=true"
+  #     - "traefik.port=9000"
+  #     - "traefik.tags=ui"
+
+  dns: 
+    image: coredns/coredns
+    container_name: dns
+    restart: always
+    command: -conf /etc/coredns/Corefile
+    ports:
+      - 53:53/udp
+    volumes:
+      - ./dns:/etc/coredns
+    labels:
+      - "traefik.enable=false"      
+    network_mode: host 
+
+  # registry:
+  #   image: registry:latest
+  #   restart: always
+  #   container_name: registry
+  #   ports:
+  #     - 5000:5000
+  #   volumes:
+  #     - ./registry/storage:/var/lib/registry
+  #     - ./registry/config.yml:/etc/docker/registry/config.yml:ro
+  #   labels:
+  #     - "traefik.backend=registry"
+  #     - "traefik.frontend.rule=Host:reg.service.io"
+  #     - "traefik.enable=true"
+  #     - "traefik.tags=reg"
+
+  # registry-ui:
+  #   image: joxit/docker-registry-ui:static
+  #   restart: always
+  #   container_name: registry-ui
+  #   ports:
+  #     - 80
+  #   environment:
+  #     - REGISTRY_URL=http://registry:5000
+  #     - DELETE_IMAGES=true
+  #   labels:
+  #     - "traefik.backend=registry-ui"
+  #     - "traefik.frontend.rule=Host:docker.service.io"
+  #     - "traefik.enable=true"
+  #     - "traefik.tags=reg"
+
+  proxy:
+    image: traefik
+    container_name: proxy
+    restart: always
+    network_mode: host 
+    privileged: true
+    ports:
+      - 80:80
+      - 8080:8080
+    labels:
+      - "traefik.backend=proxy"
+      - "traefik.frontend.rule=Host:proxy.service.io"
+      - "traefik.enable=true"
+      - "traefik.port=8080"
+      - "traefik.tags=proxy"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./proxy/:/etc/traefik/
+    command:
+      - '--configFile=/etc/traefik/traefik.toml'
+

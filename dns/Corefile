@@ -1,0 +1,5 @@
+.:53 {
+    file /etc/coredns/service.io service.io
+    forward . 8.8.8.8:53
+    log
+}
