@@ -1,1 +1,1 @@
-# A docker-compose dev ci/cd envoirment with drone+gogs+traefik+coreDNS
+# A docker-compose dev ci/cd environment with drone+gogs+traefik+coreDNS
